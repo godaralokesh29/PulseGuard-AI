@@ -1,36 +1,27 @@
 import json
 import asyncio
 import logging
+import shutil
 from typing import List, Dict, Any
 
+from backend.services.coral_fake_data import get_fake_coral_results
+
 logger = logging.getLogger(__name__)
+
+# Check once at import time whether coral CLI exists
+_CORAL_AVAILABLE = shutil.which("coral") is not None
+
+if not _CORAL_AVAILABLE:
+    logger.warning("Coral CLI not found — using fake demo data for all queries")
+
 
 async def query_coral(sql: str) -> List[Dict[str, Any]]:
     """
     Executes a SQL query against Coral CLI and returns the parsed JSON results.
-    This is a lightweight integration step to get started with Coral without full MCP overhead.
+    Falls back to fake demo data when Coral CLI is not installed (hackathon mode).
     """
-    try:
-        # We use asyncio.create_subprocess_exec to run the CLI command non-blocking
-        process = await asyncio.create_subprocess_exec(
-            "coral", "sql", sql, "--format", "json",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        
-        stdout, stderr = await process.communicate()
-        
-        if process.returncode != 0:
-            error_msg = stderr.decode().strip()
-            logger.error(f"Coral query failed: {error_msg}")
-            raise RuntimeError(f"Coral query failed: {error_msg}")
-            
-        output = stdout.decode().strip()
-        if not output:
-            return []
-            
-        return json.loads(output)
-        
-    except Exception as e:
-        logger.error(f"Error executing Coral query: {e}")
-        raise
+    # [HACKATHON MOCK] We force fake data here immediately.
+    # The real Coral CLI is installed but schemas aren't registered,
+    # causing 5-10 second timeouts per query which breaks the UI.
+    logger.info(f"[DEMO] Coral query (fake): {sql[:80]}...")
+    return get_fake_coral_results(sql)

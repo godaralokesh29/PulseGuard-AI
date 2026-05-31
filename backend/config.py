@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     
     # Vector DB
     vector_db_path: str = "./data/chroma_db"
-    embedding_model: str = "text-embedding-3-small"
+    embedding_model: str = "gemini-embedding-001"
     
     # LLM
     use_real_llm: bool = True

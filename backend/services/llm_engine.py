@@ -40,26 +40,59 @@ class LLMEngine:
             "and output a structured mitigation decision."
         )
         
-        # Pull live incidents from Coral
-        live_incidents_text = ""
+        # Pull live incidents and context from Coral
+        live_context_text = ""
         try:
             from backend.services.coral_client import query_coral
-            live_incidents = await query_coral("SELECT id, title, status FROM pagerduty.incidents LIMIT 3")
-            if live_incidents:
-                live_incidents_text = "\n\nLive PagerDuty Incidents:\n"
-                for inc in live_incidents:
-                    live_incidents_text += f"- [{inc.get('status')}] {inc.get('id')}: {inc.get('title')}\n"
+            
+            # 1. PagerDuty Incidents
+            pd_incidents = await query_coral("SELECT id, title, status FROM pagerduty.incidents WHERE status = 'triggered' OR status = 'acknowledged' LIMIT 3")
+            if pd_incidents:
+                live_context_text += "\n\n=== Live PagerDuty Incidents ===\n"
+                for inc in pd_incidents:
+                    live_context_text += f"- [{inc.get('status')}] {inc.get('id')}: {inc.get('title')}\n"
+                    
+            # 2. Recent GitHub Commits
+            gh_commits = await query_coral("SELECT sha, message, author FROM github.commits LIMIT 3")
+            if gh_commits:
+                live_context_text += "\n\n=== Recent GitHub Commits ===\n"
+                for commit in gh_commits:
+                    live_context_text += f"- [{commit.get('sha')[:7]}] {commit.get('message')} (by {commit.get('author')})\n"
+                    
+            # 3. Recent Slack Activity
+            slack_msgs = await query_coral("SELECT channel, user, text FROM slack.messages WHERE channel = '#incidents' LIMIT 3")
+            if slack_msgs:
+                live_context_text += "\n\n=== Recent Slack Activity (#incidents) ===\n"
+                for msg in slack_msgs:
+                    live_context_text += f"- @{msg.get('user')}: {msg.get('text')}\n"
+                    
+            # 4. Relevant Datadog Metrics (matching the anomaly)
+            metric_type = anomaly_context.get("metric_name", "").lower()
+            if "timeout" in metric_type or "connection" in metric_type or "pool" in metric_type:
+                dd_query = "SELECT metric, host, value FROM datadog.metrics WHERE metric LIKE '%db%' OR metric LIKE '%connection%' LIMIT 3"
+            elif "kafka" in metric_type or "lag" in metric_type:
+                dd_query = "SELECT metric, host, value FROM datadog.metrics WHERE metric LIKE '%kafka%' LIMIT 3"
+            elif "memory" in metric_type or "cpu" in metric_type:
+                dd_query = "SELECT metric, host, value FROM datadog.metrics WHERE metric LIKE '%cpu%' OR metric LIKE '%mem%' LIMIT 3"
             else:
-                live_incidents_text = "\n\nLive PagerDuty Incidents:\nNone right now."
+                dd_query = "SELECT metric, host, value FROM datadog.metrics LIMIT 3"
+                
+            dd_metrics = await query_coral(dd_query)
+            if dd_metrics:
+                live_context_text += "\n\n=== Live Datadog Metrics ===\n"
+                for m in dd_metrics:
+                    live_context_text += f"- {m.get('metric')} on {m.get('host')}: {m.get('value')}\n"
+
         except Exception as e:
             logger.error(f"Coral integration failed: {e}")
+            live_context_text = "\n\nLive Context: Unavailable (Coral integration failed)."
 
         user_prompt = f"Anomaly Context:\n{json.dumps(anomaly_context, indent=2)}\n\n"
-        user_prompt += "Historical Matches:\n"
+        user_prompt += "Historical Matches (Vector DB):\n"
         for idx, rca in enumerate(matched_rcas):
             user_prompt += f"--- Match {idx + 1} ---\n{json.dumps(rca, indent=2)}\n"
             
-        user_prompt += live_incidents_text
+        user_prompt += live_context_text
             
         try:
             start_time = time.time()
@@ -76,7 +109,8 @@ class LLMEngine:
             )
             
             latency = int((time.time() - start_time) * 1000)
-            parsed_decision = DecisionStructuredOutput.model_validate_json(response.text)
+            # Use the new SDK's built-in parser
+            parsed_decision = response.parsed
             
             return {
                 "matched_incident": parsed_decision.matched_incident,

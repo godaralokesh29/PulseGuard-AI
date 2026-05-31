@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 
 import chromadb
 from chromadb.config import Settings
-import openai
+from google import genai
 
 from backend.config import get_settings
 from backend.database.redis_cache import cache_response
@@ -33,7 +33,7 @@ class VectorDatabase:
             settings=Settings(anonymized_telemetry=False),
         )
 
-        self.openai_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
+        self.gemini_client = genai.Client(api_key=settings.gemini_api_key)
         self.embedding_model = embedding_model
 
         self.collection_name = "incident_rcas"
@@ -47,13 +47,13 @@ class VectorDatabase:
     # ------------------------------------------------------------------
 
     async def get_embedding(self, text: str) -> List[float]:
-        """Generate embedding using OpenAI API."""
+        """Generate embedding using Gemini API."""
         try:
-            response = await self.openai_client.embeddings.create(
-                input=text,
+            response = await self.gemini_client.aio.models.embed_content(
                 model=self.embedding_model,
+                contents=text,
             )
-            return response.data[0].embedding
+            return response.embeddings[0].values
         except Exception as e:
             logger.error(f"Failed to generate embedding: {e}")
             raise

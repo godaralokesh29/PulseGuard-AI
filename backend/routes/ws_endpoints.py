@@ -84,6 +84,8 @@ async def websocket_incidents(websocket: WebSocket):
                         tenant_id = message.get("tenant_id")
                         logger.info(f"Client {client_id} subscribed to tenant: {tenant_id}")
                     
+                except WebSocketDisconnect:
+                    raise
                 except json.JSONDecodeError:
                     logger.warning(f"Invalid JSON from client {client_id}")
                 except Exception as e:

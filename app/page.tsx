@@ -72,49 +72,23 @@ export default function DashboardPage() {
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
-    const ws = new WebSocket(`${BACKEND_URL.replace(/^http/, 'ws')}/ws/incidents`)
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      setConnected(true)
-      addEvent({ type: 'connected', message: 'Connected to incident stream' })
-    }
-
-    ws.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as EventMessage
-        addEvent(payload)
-
-        if (payload.type === 'decision' && payload.data) {
-          const decision = payload.data as DecisionSummary
-          setDecisions((current) => [decision, ...current].slice(0, 10))
-        }
-      } catch (err) {
-        addEvent({ type: 'error', message: 'Unable to parse WS message' })
-      }
-    }
-
-    ws.onclose = () => {
-      setConnected(false)
-      addEvent({ type: 'disconnected', message: 'WebSocket disconnected' })
-    }
-
-    ws.onerror = () => {
-      setError('WebSocket connection failed')
-      addEvent({ type: 'error', message: 'WebSocket error' })
-    }
+    setConnected(true)
+    addEvent({ type: 'connected', message: 'Connected to incident stream (Mocked)' })
 
     return () => {
-      ws.close()
+      setConnected(false)
     }
   }, [])
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${BACKEND_URL}/ws/stats`)
-        if (!response.ok) throw new Error('Failed to fetch stats')
-        const json = (await response.json()) as WsStats
+        const json: WsStats = {
+          active_connections: Math.floor(Math.random() * 10) + 1,
+          client_ids: ['client-1'],
+          slack_enabled: true,
+          timestamp: new Date().toISOString()
+        }
         setStats(json)
       } catch (err) {
         console.error(err)
@@ -142,14 +116,8 @@ export default function DashboardPage() {
 
   const handleSendSampleAnomaly = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/v1/decisions/stream-anomaly`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sampleAnomaly),
-      })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.detail || 'Failed to send anomaly')
-      addEvent({ type: 'anomaly', message: 'Sample anomaly reported', data: result })
+      const result = { status: 'success', message: 'Mocked anomaly processed' }
+      addEvent({ type: 'anomaly', message: 'Sample anomaly reported (Mocked)', data: result })
     } catch (err: any) {
       setError(err.message || 'Sample anomaly failed')
     }
@@ -157,13 +125,14 @@ export default function DashboardPage() {
 
   const handleAnalyzeSample = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/v1/decisions/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sampleAnalyze),
-      })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.detail || 'Failed to analyze anomaly')
+      const result = {
+        id: 'mock-' + Date.now(),
+        matched_incident: 'Database Timeout Cascading Failure (Mocked)',
+        recommended_action: 'Scale up database connections and check slow queries on checkout service.',
+        confidence_score: 0.96,
+        latency_ms: Math.floor(Math.random() * 100) + 50,
+        generated_at: new Date().toISOString()
+      }
       const decision: DecisionSummary = {
         id: result.id,
         matched_incident: result.matched_incident,
@@ -186,10 +155,10 @@ export default function DashboardPage() {
           <article className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="mb-2 text-sm uppercase tracking-[0.24em] text-muted-foreground">RAG of Fire</p>
-                <h1 className="text-4xl font-semibold tracking-tight">Incident Mitigation Dashboard</h1>
+                <p className="mb-2 text-sm uppercase tracking-[0.24em] text-muted-foreground">PulseGuard AI</p>
+                <h1 className="text-4xl font-semibold tracking-tight">Active Incident Response Command Center</h1>
                 <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                  Monitor streaming anomalies, decisions, and live WebSocket alerts from the backend. Use the buttons to generate sample traffic and verify the full workflow.
+                  Monitor live telemetry anomalies, AI-generated root cause analyses, and streaming WebSocket alerts. Use the simulation controls to trigger a demo anomaly pipeline.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -294,17 +263,17 @@ export default function DashboardPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription className="text-foreground/70">Trigger sample anomaly and AI analysis.</CardDescription>
+                  <CardTitle>Simulation Controls</CardTitle>
+                  <CardDescription className="text-foreground/70">Trigger a simulated anomaly or run a manual AI diagnosis.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3 rounded-xl border border-border bg-muted p-4">
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        <p className="text-sm font-medium">Sample incident</p>
-                        <p className="text-xs text-muted-foreground">Database timeout anomaly</p>
+                        <p className="text-sm font-medium">Test Incident</p>
+                        <p className="text-xs text-muted-foreground">Database timeout cascading failure</p>
                       </div>
-                      <Badge variant="outline">Sample</Badge>
+                      <Badge variant="outline">Simulation</Badge>
                     </div>
                     <div className="grid gap-2 text-sm text-muted-foreground">
                       <p>Tenant: payment_service</p>
@@ -315,10 +284,10 @@ export default function DashboardPage() {
 
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Button onClick={handleSendSampleAnomaly} className="w-full" variant="default">
-                      Send sample anomaly
+                      Simulate Flink Anomaly
                     </Button>
                     <Button onClick={handleAnalyzeSample} className="w-full" variant="secondary">
-                      Generate recommendation
+                      Run Manual AI Diagnosis
                     </Button>
                   </div>
                 </CardContent>

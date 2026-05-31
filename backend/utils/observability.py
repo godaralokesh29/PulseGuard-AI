@@ -20,18 +20,21 @@ def setup_observability(app: FastAPI):
         app.mount("/metrics", metrics_app)
         logger.info("Mounted Prometheus metrics at /metrics")
 
-        # OpenTelemetry Tracing
-        resource = Resource.create(attributes={
-            "service.name": settings.app_name,
-            "service.version": settings.app_version
-        })
-        
-        provider = TracerProvider(resource=resource)
-        otlp_exporter = OTLPSpanExporter(endpoint=settings.otel_exporter_otlp_endpoint, insecure=True)
-        processor = BatchSpanProcessor(otlp_exporter)
-        provider.add_span_processor(processor)
-        
-        trace.set_tracer_provider(provider)
+        # OpenTelemetry Tracing (Skip if running locally without Jaeger to prevent spam)
+        if "localhost" not in settings.otel_exporter_otlp_endpoint:
+            resource = Resource.create(attributes={
+                "service.name": settings.app_name,
+                "service.version": settings.app_version
+            })
+            
+            provider = TracerProvider(resource=resource)
+            otlp_exporter = OTLPSpanExporter(endpoint=settings.otel_exporter_otlp_endpoint, insecure=True)
+            processor = BatchSpanProcessor(otlp_exporter)
+            provider.add_span_processor(processor)
+            
+            trace.set_tracer_provider(provider)
+        else:
+            logger.info("Skipping OpenTelemetry export (local dev mode detected)")
         
         # Instrument FastAPI
         FastAPIInstrumentor.instrument_app(app)

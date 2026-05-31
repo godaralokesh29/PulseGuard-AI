@@ -6,7 +6,7 @@ pydantic-settings==2.1.0
 
 # Async & Concurrency
 asyncio==3.4.3
-aiohttp==3.9.1
+aiohttp>=3.10.0
 
 # Database & ORM
 sqlalchemy==2.0.25

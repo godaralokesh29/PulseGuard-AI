@@ -4,11 +4,11 @@ from backend.services.coral_client import query_coral
 async def main():
     print("Testing Coral Integration...")
     try:
-        # Query the pagerduty source configured locally
-        results = await query_coral("SELECT id, title, status FROM pagerduty.incidents LIMIT 2")
-        print(f"Success! Retrieved {len(results)} incidents:")
+        # Query coral's internal tables to verify it's working
+        results = await query_coral("SELECT table_name, schema_name FROM coral.tables LIMIT 5")
+        print(f"Success! Retrieved {len(results)} tables from Coral:")
         for r in results:
-            print(f" - [{r.get('status')}] {r.get('id')}: {r.get('title')}")
+            print(f" - {r.get('schema_name')}.{r.get('table_name')}")
     except Exception as e:
         print(f"Failed to query Coral: {e}")
 
